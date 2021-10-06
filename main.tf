@@ -25,8 +25,6 @@ resource "azurerm_virtual_network" "consumer_vnet" {
   location            = var.location
   resource_group_name = azurerm_resource_group.rg.name
   address_space       = [var.network_cidr_consumer]
-
-
 }
 
 resource "azurerm_subnet" "app1Subnet" {
@@ -35,13 +33,7 @@ resource "azurerm_subnet" "app1Subnet" {
   virtual_network_name = azurerm_virtual_network.consumer_vnet.name
   address_prefixes     = [var.app1_subnet_prefix]
 }
-/*
-data "azurerm_subnet" "app1Subnet" {
-  name                 = "app1Subnet"
-  virtual_network_name = azurerm_virtual_network.consumer_vnet.name
-  resource_group_name  = azurerm_resource_group.rg.name
-}
-*/
+
 #Create NSG and rules for app1Subnet
 resource "azurerm_network_security_group" "app1Subnet" {
   name                = format("%s-app1-nsg-%s", var.prefix, random_id.id.hex)
@@ -118,7 +110,7 @@ resource "azurerm_lb_rule" "rule" {
   backend_port                   = each.value
   frontend_ip_configuration_name = "myFrontEnd"
   disable_outbound_snat          = true
-  probe_id                       = azurerm_lb_probe.tcpProbe22.id
+  probe_id                       = azurerm_lb_probe.tcpProbe80.id
   backend_address_pool_id        = azurerm_lb_backend_address_pool.address_pool.id
 }
 
@@ -195,25 +187,12 @@ resource "azurerm_network_security_rule" "externalNSG" {
   resource_group_name         = azurerm_resource_group.rg.name
   network_security_group_name = azurerm_network_security_group.external.name
 }
-/*
-data "azurerm_subnet" "mgmt" {
-  name                 = "mgmt"
-  virtual_network_name = azurerm_virtual_network.provider_vnet.name
-  resource_group_name  = azurerm_resource_group.rg.name
-}
 
-data "azurerm_subnet" "external" {
-  name                 = "external"
-  virtual_network_name = azurerm_virtual_network.provider_vnet.name
-  resource_group_name  = azurerm_resource_group.rg.name
-}
-*/
 data "template_file" "init" {
   template = file("${path.module}/f5_onboard.tmpl")
   vars = {
     mgmt_gw = cidrhost(var.provider_vnet_subnets_map.mgmt.address_prefixes[0], 1)
-    #mgmt_gw = var.mgmt_subnet_gw
-    ext_gw = var.external_subnet_gw
+    ext_gw = cidrhost(var.provider_vnet_subnets_map.external.address_prefixes[0], 1)
   }
 }
 
@@ -239,6 +218,7 @@ module bigip {
    f5_ssh_publickey            = azurerm_ssh_public_key.f5_key.public_key
    resource_group_name         = azurerm_resource_group.rg.name
    location                    = var.location
+   #subnet_id                   = azurerm_subnet.provider_vnet_subnets["internal"].id
    subnet_id                   = azurerm_subnet.app1Subnet.id
    azurerm_lb_backend_address_pool_id = azurerm_lb_backend_address_pool.address_pool.id
    depends_on = [

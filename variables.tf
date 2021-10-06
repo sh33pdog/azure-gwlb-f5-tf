@@ -17,8 +17,8 @@ variable "location" {default = "East US 2"}
 #Network variables
 variable "network_cidr" {default = "10.0.0.0/16"}
 variable "network_cidr_consumer" {default = "192.168.0.0/16"}
-variable "external_subnet_gw" {default = "10.0.2.1"}
-variable "mgmt_subnet_gw" {default = "10.0.1.1"}
+#variable "external_subnet_gw" {default = "10.0.2.1"}
+#variable "mgmt_subnet_gw" {default = "10.0.1.1"}
 variable "app1_subnet_prefix" {default = "192.168.1.0/24"}
 variable "provider_vnet_subnets_map" {
     type = map

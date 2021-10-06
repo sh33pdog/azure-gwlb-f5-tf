@@ -1,10 +1,6 @@
-# Configure the Azure Provider
+
 provider "azurerm" {
   features {}
-  #subscription_id = var.subscription_id
-  #tenant_id	    = var.tenant_id
-  #client_id	    = var.client_id
-  #client_secret   = var.client_secret
 }
 
 terraform {
@@ -20,4 +16,5 @@ terraform {
       version = ">2.28.0"
     }
   }
+  required_version = "~> 1.0.5"
 }

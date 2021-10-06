@@ -115,6 +115,9 @@ extension_services:
             class: System
             autoPhonehome: true
             hostname: "{{{HOST_NAME}}}.local"
+          HTTPD:
+            class: HTTPD
+            authPamIdleTimeout: 86400
           quickstart:
             class: User
             userType: regular
@@ -219,6 +222,8 @@ extension_services:
               pool: /Tenant_1/Shared/shared_pool
               serverTLS:
                 bigip: /Common/clientssl
+              clientTLS:
+                bigip: /Common/serverssl
               redirect80: false
             WAFPolicy:
               class: WAF_Policy
@@ -232,15 +237,15 @@ post_onboard_enabled:
     commands:
       - tmsh create net tunnels vxlan gwlb-ext-vxlan-prof port 2001 flooding-type none
       - tmsh create net tunnels vxlan gwlb-int-vxlan-prof port 2002 flooding-type none
-      - tmsh create net tunnels tunnel gwlb_external_tun key 801 profile gwlb-ext-vxlan-prof local-address {{{SELF_IP_EXTERNAL_ADDRESS}}} remote-address any
-      - tmsh create net tunnels tunnel gwlb_internal_tun key 802 profile gwlb-int-vxlan-prof local-address {{{SELF_IP_EXTERNAL_ADDRESS}}} remote-address any
+      - tmsh create net tunnels tunnel gwlb_external_tun key 801 profile gwlb-ext-vxlan-prof local-address {{{SELF_IP_EXTERNAL_ADDRESS}}} remote-address any mtu 1450
+      - tmsh create net tunnels tunnel gwlb_internal_tun key 802 profile gwlb-int-vxlan-prof local-address {{{SELF_IP_EXTERNAL_ADDRESS}}} remote-address any mtu 1450
       - tmsh create net vlan-group vg1 members add { gwlb_external_tun }
       - tmsh create net vlan-group vg2 members add { gwlb_internal_tun } bridge-traffic enabled
       - tmsh create net self vxlan_external_self address 192.168.1.11/28 vlan vg1 allow-service all
       - tmsh create net self vxlan_internal_self address 192.168.2.11/28 vlan vg2 allow-service all
       - tmsh create net arp fake_arp_entry_ext ip-address 192.168.1.1 mac-address ff:ff:ff:ff:ff:ff
       - tmsh create net arp fake_arp_entry_int ip-address 192.168.2.1 mac-address ff:ff:ff:ff:ff:ee
-      - "GATEWAY_ADDRESS=10.0.2.8; GATEWAY_MAC=$(arping -I external -c 1 $GATEWAY_ADDRESS | egrep -o '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}'); tmsh modify net fdb tunnel gwlb_external_tun records add { $GATEWAY_MAC { description gwlb endpoint $GATEWAY_ADDRESS } }; tmsh modify net fdb tunnel gwlb_internal_tun records add { ff:ff:ff:ff:ff:ee { description fwd_node endpoint $GATEWAY_ADDRESS } }"
+      - "GATEWAY_ADDRESS=10.0.2.8; tmsh modify net fdb tunnel gwlb_external_tun records add { ff:ff:ff:ff:ff:ee { description fwd_node endpoint $GATEWAY_ADDRESS } }; tmsh modify net fdb tunnel gwlb_internal_tun records add { ff:ff:ff:ff:ff:ee { description fwd_node endpoint $GATEWAY_ADDRESS } }"
       - tmsh save /sys config
 EOF
 
