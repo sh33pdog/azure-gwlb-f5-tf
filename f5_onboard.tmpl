@@ -245,7 +245,7 @@ post_onboard_enabled:
       - tmsh create net self vxlan_internal_self address 192.168.2.11/28 vlan vg2 allow-service all
       - tmsh create net arp fake_arp_entry_ext ip-address 192.168.1.1 mac-address ff:ff:ff:ff:ff:ff
       - tmsh create net arp fake_arp_entry_int ip-address 192.168.2.1 mac-address ff:ff:ff:ff:ff:ee
-      - "GATEWAY_ADDRESS=10.0.2.8; tmsh modify net fdb tunnel gwlb_external_tun records add { ff:ff:ff:ff:ff:ee { description fwd_node endpoint $GATEWAY_ADDRESS } }; tmsh modify net fdb tunnel gwlb_internal_tun records add { ff:ff:ff:ff:ff:ee { description fwd_node endpoint $GATEWAY_ADDRESS } }"
+      - "GATEWAY_ADDRESS=${gwlb_frontend_ip}; tmsh modify net fdb tunnel gwlb_external_tun records add { ff:ff:ff:ff:ff:ee { description fwd_node endpoint $GATEWAY_ADDRESS } }; tmsh modify net fdb tunnel gwlb_internal_tun records add { ff:ff:ff:ff:ff:ee { description fwd_node endpoint $GATEWAY_ADDRESS } }"
       - tmsh save /sys config
 EOF
 

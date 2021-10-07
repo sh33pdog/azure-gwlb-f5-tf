@@ -41,3 +41,14 @@ output private_addresses {
   description = "List of BIG-IP private addresses"
   value       = concat(azurerm_network_interface.external_nic.*.private_ip_addresses, azurerm_network_interface.external_public_nic.*.private_ip_addresses, azurerm_network_interface.internal_nic.*.private_ip_address)
 }
+
+output ext_eni_id {
+  description = "Id of external ENI to put behind GWLB"
+  value       = azurerm_network_interface.external_public_nic.*.id
+}
+
+output ext_eni_ipconfig_name {
+  description = "Name of IPConfigs on first ext ENI"
+  value       = azurerm_network_interface.external_public_nic[0].ip_configuration.*.name
+}
+

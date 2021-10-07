@@ -70,6 +70,9 @@ resource "azurerm_public_ip" "public_lb_frontend_ip" {
 }
 
 resource "azurerm_lb" "public_lb" {
+  depends_on = [
+    azurerm_resource_group_template_deployment.arm_deployment_gwlb
+  ]
   name                = "MyPublicLoadBalancer"
   location            = var.location
   resource_group_name = azurerm_resource_group.rg.name
@@ -126,6 +129,20 @@ resource "azurerm_lb_outbound_rule" "outbound_rule" {
   }
 }
 
+module app_server {
+  count                       = var.instance_count_app
+  source                      = "./modules/app_server/"
+  vm_name                      = "appserver${count.index}"
+  f5_ssh_publickey            = azurerm_ssh_public_key.f5_key.public_key
+  resource_group_name         = azurerm_resource_group.rg.name
+  location                    = var.location
+  subnet_id                   = azurerm_subnet.app1Subnet.id
+  azurerm_lb_backend_address_pool_id = azurerm_lb_backend_address_pool.address_pool.id
+  depends_on = [
+    azurerm_lb_outbound_rule.outbound_rule
+  ]
+}
+
 resource "azurerm_virtual_network" "provider_vnet" {
   name                = "${var.rg_name}-provider-vnet"
   location            = var.location
@@ -141,6 +158,27 @@ resource "azurerm_subnet" "provider_vnet_subnets" {
   address_prefixes     = each.value.address_prefixes
 }
 
+data "template_file" "arm_template_gwlb" {
+  template = file("${path.module}/gwlb-arm.json")
+}
+
+resource "azurerm_resource_group_template_deployment" "arm_deployment_gwlb" {
+  depends_on = [
+    azurerm_subnet.provider_vnet_subnets["external"]
+  ]
+  name                = "arm_deployment_gwlb"
+  resource_group_name = azurerm_resource_group.rg.name
+  deployment_mode     = "Incremental"
+  parameters_content = jsonencode({
+    "frontendSubnetId" = {
+      value = azurerm_subnet.provider_vnet_subnets["external"].id
+    }
+    "agwLoadBalancerName" = {
+      value = "MyGatewayLoadBalancer"
+    }
+  })
+  template_content = data.template_file.arm_template_gwlb.rendered
+}
 
 #Create NSG and rules for mgmt NIC
 resource "azurerm_network_security_group" "mgmt" {
@@ -193,6 +231,7 @@ data "template_file" "init" {
   vars = {
     mgmt_gw = cidrhost(var.provider_vnet_subnets_map.mgmt.address_prefixes[0], 1)
     ext_gw = cidrhost(var.provider_vnet_subnets_map.external.address_prefixes[0], 1)
+    gwlb_frontend_ip = jsondecode(azurerm_resource_group_template_deployment.arm_deployment_gwlb.output_content).agwFrontEndIP.value
   }
 }
 
@@ -207,23 +246,24 @@ module bigip {
    mgmt_securitygroup_ids      = [azurerm_network_security_group.mgmt.id]
    external_subnet_ids         = [{"subnet_id" =  azurerm_subnet.provider_vnet_subnets["external"].id, "public_ip" = true,"private_ip_primary" = "", "private_ip_secondary" = "" }]
    external_securitygroup_ids  = [azurerm_network_security_group.external.id]
-   availabilityZones           =  var.availabilityZones
+   availabilityZones           = var.availabilityZones
    custom_user_data            = data.template_file.init.rendered
  }
 
- module app_server {
-   count                       = var.instance_count_app
-   source                      = "./modules/app_server/"
-   vm_name                      = "appserver${count.index}"
-   f5_ssh_publickey            = azurerm_ssh_public_key.f5_key.public_key
-   resource_group_name         = azurerm_resource_group.rg.name
-   location                    = var.location
-   #subnet_id                   = azurerm_subnet.provider_vnet_subnets["internal"].id
-   subnet_id                   = azurerm_subnet.app1Subnet.id
-   azurerm_lb_backend_address_pool_id = azurerm_lb_backend_address_pool.address_pool.id
-   depends_on = [
-     azurerm_lb_outbound_rule.outbound_rule
-   ]
- }
- 
- 
+ resource "azurerm_network_interface_backend_address_pool_association" "gwlb_backend_pool_association" {
+  count                       = var.instance_count
+  network_interface_id        = module.bigip[count.index].ext_eni_id[0]
+  ip_configuration_name       = module.bigip[count.index].ext_eni_ipconfig_name[0]
+  backend_address_pool_id     = jsondecode(azurerm_resource_group_template_deployment.arm_deployment_gwlb.output_content).agwBackEndLoadBalancerId.value
+}
+
+locals {
+  gwlb_id = jsondecode(azurerm_resource_group_template_deployment.arm_deployment_gwlb.output_content).agwFrontEndLoadBalancerId.value
+}
+
+resource "null_resource" "update_standard_lb" {
+  provisioner "local-exec" {
+    command = "az network lb frontend-ip update -g ${azurerm_resource_group.rg.name} --lb-name ${azurerm_lb.public_lb.name} -n ${azurerm_lb.public_lb.frontend_ip_configuration[0].name} --public-ip-address ${azurerm_public_ip.public_lb_frontend_ip.name} --gateway-lb ${local.gwlb_id}"
+    interpreter = ["/bin/bash", "-c"]
+  }
+}
