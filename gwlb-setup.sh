@@ -10,10 +10,10 @@ frontendIPNamePublicLB='myFrontEnd'             # name of frontend configuration
 publicIPName='MyPublicIP'                       # name of public IP object
 healthProbeName='httpProbe80'
 
-f5vm_ext_nic_name='bigip-bb5c-ext-nic-public-0'
-ipconfig_name='bigip-bb5c-ext-public-ip-0'
-f5vm_ext_nic_name1='bigip-f204-ext-nic-public-0'
-ipconfig_name1='bigip-f204-ext-public-ip-0'
+f5vm_ext_nic_name='bigip-405c-ext-nic-public-0'
+ipconfig_name='bigip-405c-ext-public-ip-0'
+f5vm_ext_nic_name1='bigip-5318-ext-nic-public-0'
+ipconfig_name1='bigip-5318-ext-public-ip-0'
 
 #create GWLB
 az network lb create -g $rgName -n $gwlb_name --sku Gateway --vnet-name $vnetName --subnet external --frontend-ip-name $frontendIPNameGW --backend-pool-name myBackendPool
