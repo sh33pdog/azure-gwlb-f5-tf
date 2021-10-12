@@ -37,7 +37,8 @@ resource "azurerm_linux_virtual_machine" "vm" {
 
     computer_name  = var.vm_name
     admin_username = "azureuser"
-    disable_password_authentication = true
+    admin_password = var.upassword
+    disable_password_authentication = false
 
     admin_ssh_key {
         username       = "azureuser"
@@ -48,10 +49,4 @@ resource "azurerm_linux_virtual_machine" "vm" {
         storage_account_uri = azurerm_storage_account.mystorageaccount.primary_blob_endpoint
     }
 */
-}
-
-resource "azurerm_network_interface_backend_address_pool_association" "pool_association" {
-  network_interface_id    = azurerm_network_interface.nic.id
-  ip_configuration_name   = "ipconfig0"
-  backend_address_pool_id = var.azurerm_lb_backend_address_pool_id
 }
