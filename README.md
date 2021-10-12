@@ -23,6 +23,11 @@ terraform output
 4. (optional) Access the linux vm that is hosting the demo web app (ssh details are in Terraform output). Optionally deploy your own web app that listens on port 80 or 443.
 
 ### Delete this demo
+First, we will need to delete the GWLB we created with our script earlier.
+````
+. gwlb-destroy.sh
+````
+Then we can use Terraform to destroy the remaining infrastructure.
 ````
 terraform destroy -auto-approve
 ````
