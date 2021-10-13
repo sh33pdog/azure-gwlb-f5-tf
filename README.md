@@ -4,7 +4,6 @@ Deploys Azure Gateway Load Balancer and F5 BIG-IP using Terraform
 ## Instructions
 
 ### Deploy this demo
-Because the Terraform provider has not been updated for the new Azure Gateway Load Balancer type (as of Oct 2021), we will deploy most of our infrastructure with Terraform, but then the final updates will be made via Azure CLI.
 ````
 git clone https://github.com/mikeoleary/azure-gwlb-f5-tf.git
 cd azure-gwlb-f5-tf
@@ -23,19 +22,13 @@ terraform output
 4. (optional) Access the linux vm that is hosting the demo web app (ssh details are in Terraform output). Optionally deploy your own web app that listens on port 80 or 443.
 
 ### Delete this demo
-First, we will need to delete the GWLB we created with our script earlier.
-````
-. gwlb-destroy.sh
-````
-Then we can use Terraform to destroy the remaining infrastructure.
+We can use Terraform to destroy the remaining infrastructure.
 ````
 terraform destroy -auto-approve
 ````
 
-## Requirements
-- terraform version ~> 1.0.8
-- az cli installed and authenticated
-
+## Architecture
+![Architecture](images/Azure-GWLB.png)
 
 ## Prerequisites
 - terraform version ~> 1.0.8
@@ -51,5 +44,5 @@ The below providers were tested and working with Terraform 1.0.8
   * By Default, this solution uses f5-bigip-virtual-edition-200m-best-hourly
     * Azure CLI:
     ````
-    az vm image terms accept --urn f5-networks:f5-big-ip-best:f5-bigip-virtual-edition-200m-best-hourly:latest"
+    az vm image terms accept --urn f5-networks:f5-big-ip-best:f5-bigip-virtual-edition-200m-best-hourly:latest
     ````
