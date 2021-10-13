@@ -7,6 +7,11 @@ output "ssh_address_for_app_server" {
   value       = "ssh azureuser@${azurerm_public_ip.public_lb_frontend_ip.ip_address}"
 }
 
+output "ssh_username_for_app_server" {
+  description = "SSH username for app server"
+  value       = "azureuser"
+}
+
 output "bigip_mgmt_public_ip_addresses" {
   description = "public ip for bigip mgmt console"
   value       = module.bigip.*.mgmtPublicIP

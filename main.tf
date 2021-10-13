@@ -254,6 +254,7 @@ module bigip {
    external_securitygroup_ids  = [azurerm_network_security_group.external.id]
    availabilityZones           = var.availabilityZones
    custom_user_data            = data.template_file.init.rendered
+   f5_version                   = var.f5_version
  }
 
  resource "azurerm_network_interface_backend_address_pool_association" "gwlb_backend_pool_association" {
@@ -280,7 +281,7 @@ resource "null_resource" "update_standard_lb" {
     gwlb_id = jsondecode(azurerm_resource_group_template_deployment.arm_deployment_gwlb.output_content).agwFrontEndLoadBalancerId.value
   }
   provisioner "local-exec" {
-    command = "sleep 420s ; az network lb frontend-ip update -g ${self.triggers.rg} --lb-name ${self.triggers.public_lb_name} -n ${self.triggers.frontend_ip_name} --public-ip-address ${self.triggers.public_ip_address} --gateway-lb ${self.triggers.gwlb_id}"
+    command = "az network lb frontend-ip update -g ${self.triggers.rg} --lb-name ${self.triggers.public_lb_name} -n ${self.triggers.frontend_ip_name} --public-ip-address ${self.triggers.public_ip_address} --gateway-lb ${self.triggers.gwlb_id}"
     interpreter = ["/bin/bash", "-c"]
   }
 

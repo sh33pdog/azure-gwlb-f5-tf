@@ -14,6 +14,9 @@ variable "prefix" {default = "mydemo"}
 variable "uname" {default = "azureuser"}
 variable "upassword" {default = "DefaultPass12345!"}
 variable "location" {default = "East US 2"}
+variable "f5_version" {
+  default = "latest"
+}
 #Network variables
 variable "network_cidr" {default = "10.0.0.0/16"}
 variable "network_cidr_consumer" {default = "192.168.0.0/16"}
