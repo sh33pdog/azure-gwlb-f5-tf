@@ -70,6 +70,9 @@ resource "azurerm_public_ip" "public_lb_frontend_ip" {
 }
 
 resource "azurerm_lb" "public_lb" {
+  depends_on = [
+    module.bigip
+  ]
   name                = "MyPublicLoadBalancer"
   location            = var.location
   resource_group_name = azurerm_resource_group.rg.name
@@ -78,7 +81,9 @@ resource "azurerm_lb" "public_lb" {
   frontend_ip_configuration {
     name                 = "myFrontEnd"
     public_ip_address_id = azurerm_public_ip.public_lb_frontend_ip.id
+    gateway_load_balancer_frontend_ip_configuration_id = azurerm_lb.gwlb.frontend_ip_configuration[0].id
   }
+
 }
 
 resource "azurerm_lb_probe" "tcpProbe80" {
@@ -111,7 +116,7 @@ resource "azurerm_lb_rule" "rule" {
   frontend_ip_configuration_name = "myFrontEnd"
   disable_outbound_snat          = true
   probe_id                       = azurerm_lb_probe.tcpProbe22.id
-  backend_address_pool_id        = azurerm_lb_backend_address_pool.address_pool.id
+  backend_address_pool_ids       = [azurerm_lb_backend_address_pool.address_pool.id]
 }
 
 resource "azurerm_lb_outbound_rule" "outbound_rule" {
@@ -135,9 +140,6 @@ module app_server {
   resource_group_name         = azurerm_resource_group.rg.name
   location                    = var.location
   subnet_id                   = azurerm_subnet.app1Subnet.id
-  depends_on = [
-   azurerm_lb_outbound_rule.outbound_rule
-  ]
   }
 
  resource "azurerm_network_interface_backend_address_pool_association" "app_backend_pool_association" {
@@ -162,23 +164,56 @@ resource "azurerm_subnet" "provider_vnet_subnets" {
   address_prefixes     = each.value.address_prefixes
 }
 
-data "template_file" "arm_template_gwlb" {
-  template = file("${path.module}/gwlb-arm.json")
+resource "azurerm_lb" "gwlb" {
+  name                = "MyGatewayLoadBalancer"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  sku                 = "Gateway"
+
+  frontend_ip_configuration {
+    name                          = "myGWLBFrontEnd"
+    subnet_id                     = azurerm_subnet.provider_vnet_subnets["external"].id
+    private_ip_address_version    = "IPv4"
+    private_ip_address_allocation = "Dynamic"
+  }
 }
 
-resource "azurerm_resource_group_template_deployment" "arm_deployment_gwlb" {
-  name                = "arm_deployment_gwlb"
+resource "azurerm_lb_backend_address_pool" "gwlb_address_pool" {
+  loadbalancer_id = azurerm_lb.gwlb.id
+  name            = "BackendPool1"
+  tunnel_interface {
+    port = 2002
+    identifier = 802
+    protocol = "VXLAN"
+    type = "Internal"
+  }
+  tunnel_interface {
+    port = 2001
+    identifier = 801
+    protocol = "VXLAN"
+    type = "External"
+  }
+}
+
+resource "azurerm_lb_rule" "gwlb_rule" {
+  resource_group_name            = azurerm_resource_group.rg.name
+  loadbalancer_id                = azurerm_lb.gwlb.id
+  name                           = "LbRule1"
+  protocol                       = "All"
+  frontend_port                  = 0
+  backend_port                   = 0
+  frontend_ip_configuration_name = azurerm_lb.gwlb.frontend_ip_configuration[0].name
+  probe_id                       = azurerm_lb_probe.httpProbe80.id
+  backend_address_pool_ids       = [azurerm_lb_backend_address_pool.gwlb_address_pool.id]
+}
+
+resource "azurerm_lb_probe" "httpProbe80" {
   resource_group_name = azurerm_resource_group.rg.name
-  deployment_mode     = "Incremental"
-  parameters_content = jsonencode({
-    "frontendSubnetId" = {
-      value = azurerm_subnet.provider_vnet_subnets["external"].id
-    }
-    "agwLoadBalancerName" = {
-      value = "MyGatewayLoadBalancer"
-    }
-  })
-  template_content = data.template_file.arm_template_gwlb.rendered
+  loadbalancer_id     = azurerm_lb.gwlb.id
+  name                = "httpProbe80"
+  port                = 80
+  protocol            = "Http"
+  request_path        = "/healthcheck"
 }
 
 #Create NSG and rules for mgmt NIC
@@ -233,14 +268,14 @@ data "template_file" "init" {
     bigip_password = var.upassword
     mgmt_gw = cidrhost(var.provider_vnet_subnets_map.mgmt.address_prefixes[0], 1)
     ext_gw = cidrhost(var.provider_vnet_subnets_map.external.address_prefixes[0], 1)
-    gwlb_frontend_ip = jsondecode(azurerm_resource_group_template_deployment.arm_deployment_gwlb.output_content).agwFrontEndIP.value
+    gwlb_frontend_ip = azurerm_lb.gwlb.private_ip_address
     public_lb_frontend_ip = azurerm_public_ip.public_lb_frontend_ip.ip_address
   }
 }
 
 module bigip {
    depends_on = [
-     module.app_server
+    module.app_server
    ]
    count                       = var.instance_count
    source                      = "./modules/bigip/"
@@ -261,34 +296,5 @@ module bigip {
   count                       = var.instance_count
   network_interface_id        = module.bigip[count.index].ext_eni_id[0]
   ip_configuration_name       = module.bigip[count.index].ext_eni_ipconfig_name[0]
-  backend_address_pool_id     = jsondecode(azurerm_resource_group_template_deployment.arm_deployment_gwlb.output_content).agwBackEndLoadBalancerId.value
-}
-
-locals {
-  gwlb_id = jsondecode(azurerm_resource_group_template_deployment.arm_deployment_gwlb.output_content).agwFrontEndLoadBalancerId.value
-}
-
-resource "null_resource" "update_standard_lb" {
-  depends_on = [
-    azurerm_lb.public_lb,
-    module.bigip
-  ]
-  triggers = {
-    rg = azurerm_resource_group.rg.name
-    public_lb_name = azurerm_lb.public_lb.name
-    public_ip_address = azurerm_public_ip.public_lb_frontend_ip.name
-    frontend_ip_name = azurerm_lb.public_lb.frontend_ip_configuration[0].name
-    gwlb_id = jsondecode(azurerm_resource_group_template_deployment.arm_deployment_gwlb.output_content).agwFrontEndLoadBalancerId.value
-  }
-  provisioner "local-exec" {
-    command = "az network lb frontend-ip update -g ${self.triggers.rg} --lb-name ${self.triggers.public_lb_name} -n ${self.triggers.frontend_ip_name} --public-ip-address ${self.triggers.public_ip_address} --gateway-lb ${self.triggers.gwlb_id}"
-    interpreter = ["/bin/bash", "-c"]
-  }
-
-  provisioner "local-exec" {
-    when    = destroy
-    command = "az network lb frontend-ip update -g ${self.triggers.rg} --lb-name ${self.triggers.public_lb_name} -n ${self.triggers.frontend_ip_name} --set gatewayLoadBalancer=null"    
-    interpreter = ["/bin/bash", "-c"]
-  }
-  
+  backend_address_pool_id     = azurerm_lb_backend_address_pool.gwlb_address_pool.id
 }
