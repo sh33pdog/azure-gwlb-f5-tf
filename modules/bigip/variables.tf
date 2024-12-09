@@ -78,7 +78,7 @@ variable f5_instance_type {
 
 variable f5_image_name {
   type    = string
-  default = "f5-bigip-virtual-edition-200m-best-hourly"
+  default = "f5-big-best-plus-hourly-25mbps"
 }
 variable f5_version {
   type    = string
