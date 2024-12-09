@@ -9,7 +9,7 @@ variable f5_username {
 }
 variable f5_password {
   description = "The admin password of the F5 Bigip that will be deployed"
-  default     = ""
+  default     = "DefaultPass12345!"
 }
 
 variable resource_group_name {
