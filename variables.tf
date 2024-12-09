@@ -13,7 +13,7 @@ variable "instance_count_app" {
 variable "prefix" {default = "mydemo"}
 variable "uname" {default = "azureuser"}
 variable "upassword" {default = "DefaultPass12345!"}
-variable "location" {default = "uk-south"}
+variable "location" {default = "uksouth"}
 variable "f5_version" {
   default = "latest"
 }
